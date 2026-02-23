@@ -85,16 +85,29 @@ def format_job_entry(job: dict) -> str:
 
     skills = get_atm_skills(title)
 
+    # Experience level badge
+    exp_badge = ""
+    if snippet:
+        s = snippet.lower()
+        if "fresh" in s or ("0" in s and "year" in s):
+            exp_badge = "🟢 Fresh Grad Welcome"
+        elif "entry" in s:
+            exp_badge = "🟢 Entry Level"
+        elif "1" in s or "2" in s:
+            exp_badge = "🔵 1–2 Years Exp"
+        else:
+            exp_badge = f"📋 {snippet}"
+
     lines = []
     lines.append(f"{emoji} *{_escape(title)}*")
+    if exp_badge:
+        lines.append(exp_badge)
     if company:
         lines.append(f"🏢 {_escape(company)}")
     if location:
         lines.append(f"📍 {_escape(location)}")
     if salary:
         lines.append(f"💰 {_escape(salary)}")
-    if snippet:
-        lines.append(f"ℹ️ _{_escape(snippet)}_")
     if skills:
         lines.append(f"🎓 *ATM Skills:* {', '.join(skills)}")
     if url:
@@ -118,6 +131,7 @@ def format_jobs_message(jobs: list[dict]) -> list[str]:
     now = datetime.now(SGT).strftime("%d %b %Y, %I:%M %p SGT")
     header = (
         f"✈️ *Aviation & PM Job Listings*\n"
+        f"🎯 Fresh Grad & 1–2 Years Exp\n"
         f"🕐 Updated: {now}\n"
         f"📊 {len(jobs)} jobs found\n"
         f"{'─' * 30}"

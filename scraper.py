@@ -6,18 +6,31 @@ import urllib.parse
 
 logger = logging.getLogger(__name__)
 
-# Keywords relevant to the user's background
+# Keywords relevant to the user's background (entry-level focused)
 SEARCH_QUERIES = [
-    "aviation management",
-    "airport operations",
-    "airline operations",
-    "project manager aviation",
-    "data analyst aviation",
-    "air transport",
-    "flight operations",
-    "ground handling management",
-    "aviation project management",
-    "operations analyst",
+    "aviation executive",
+    "airport operations executive",
+    "airline operations executive",
+    "junior data analyst aviation",
+    "air transport associate",
+    "flight operations officer",
+    "ground handling officer",
+    "project coordinator aviation",
+    "operations analyst entry level",
+    "graduate aviation",
+]
+
+# Titles that suggest too much seniority — used to filter out irrelevant roles
+SENIOR_TITLE_KEYWORDS = [
+    "senior", "sr.", "lead", "head of", "director", "vp ", "vice president",
+    "chief", "principal", "general manager", "gm ", "c-suite", "coo", "ceo",
+    "cto", "cfo", "svp", "evp", "partner", "managing director"
+]
+
+# Entry-level positive signals in titles
+ENTRY_LEVEL_TITLE_SIGNALS = [
+    "junior", "associate", "graduate", "trainee", "intern", "entry",
+    "assistant", "officer", "executive", "analyst", "coordinator", "specialist"
 ]
 
 HEADERS = {
@@ -35,30 +48,38 @@ HEADERS = {
 async def fetch_mcf(session: aiohttp.ClientSession) -> list[dict]:
     jobs = []
     keywords = [
-        "aviation", "air transport", "project manager", "data analyst",
-        "airport", "airline", "operations manager"
+        "aviation", "air transport", "data analyst", "airport", "airline",
+        "project coordinator", "operations executive", "graduate trainee"
     ]
-    for keyword in keywords[:4]:  # limit requests
+    for keyword in keywords[:6]:  # limit requests
         try:
+            # MCF supports filtering by max years of experience via the API
             url = (
                 f"https://www.mycareersfuture.gov.sg/api/v2/search"
-                f"?search={urllib.parse.quote(keyword)}&limit=10&page=0"
+                f"?search={urllib.parse.quote(keyword)}&limit=15&page=0"
                 f"&sortBy=new_posting_date"
+                f"&minimumYearsExperience=0&maximumYearsExperience=2"
             )
             async with session.get(url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=15)) as resp:
                 if resp.status == 200:
                     data = await resp.json()
                     results = data.get("results", [])
                     for item in results:
-                        jobs.append({
-                            "source": "MyCareersFuture",
-                            "title": item.get("title", ""),
-                            "company": item.get("postedCompany", {}).get("name", ""),
-                            "location": "Singapore",
-                            "url": f"https://www.mycareersfuture.gov.sg/job/{item.get('uuid', '')}",
-                            "salary": _mcf_salary(item),
-                            "snippet": item.get("minimumYearsExperience", ""),
-                        })
+                        min_exp = item.get("minimumYearsExperience", 0) or 0
+                        max_exp = item.get("maximumYearsExperience", 2) or 2
+                        # Only include jobs asking for 0–2 years experience
+                        if min_exp <= 2:
+                            title = item.get("title", "")
+                            if not _is_senior_title(title):
+                                jobs.append({
+                                    "source": "MyCareersFuture",
+                                    "title": title,
+                                    "company": item.get("postedCompany", {}).get("name", ""),
+                                    "location": "Singapore",
+                                    "url": f"https://www.mycareersfuture.gov.sg/job/{item.get('uuid', '')}",
+                                    "salary": _mcf_salary(item),
+                                    "snippet": _mcf_exp_label(min_exp, max_exp),
+                                })
         except Exception as e:
             logger.warning(f"MCF error for '{keyword}': {e}")
         await asyncio.sleep(1)
@@ -73,21 +94,38 @@ def _mcf_salary(item):
     return ""
 
 
+def _mcf_exp_label(min_exp: int, max_exp: int) -> str:
+    if min_exp == 0 and max_exp <= 1:
+        return "Fresh graduate welcome"
+    if min_exp == 0:
+        return f"0–{max_exp} years experience"
+    return f"{min_exp}–{max_exp} years experience"
+
+
+def _is_senior_title(title: str) -> bool:
+    """Return True if the title signals a senior/leadership role to filter out."""
+    t = title.lower()
+    return any(kw in t for kw in SENIOR_TITLE_KEYWORDS)
+
+
 # ─── Indeed (Singapore) ──────────────────────────────────────────────────────
 
 async def fetch_indeed(session: aiohttp.ClientSession) -> list[dict]:
     jobs = []
     queries = [
-        ("aviation operations", "Singapore"),
-        ("project manager aviation", "Singapore"),
-        ("data analyst aviation", "Singapore"),
-        ("airport operations manager", "Singapore"),
+        ("aviation executive entry level", "Singapore"),
+        ("junior data analyst aviation", "Singapore"),
+        ("airport operations officer", "Singapore"),
+        ("graduate trainee aviation", "Singapore"),
+        ("project coordinator aviation fresh graduate", "Singapore"),
     ]
     for q, loc in queries:
         try:
+            # &explvl=entry_level filters Indeed to entry-level postings
             url = (
                 f"https://sg.indeed.com/jobs"
-                f"?q={urllib.parse.quote(q)}&l={urllib.parse.quote(loc)}&sort=date"
+                f"?q={urllib.parse.quote(q)}&l={urllib.parse.quote(loc)}"
+                f"&sort=date&explvl=entry_level"
             )
             async with session.get(url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=15)) as resp:
                 if resp.status == 200:
@@ -100,15 +138,18 @@ async def fetch_indeed(session: aiohttp.ClientSession) -> list[dict]:
                         location_el = card.select_one("[data-testid='text-location']")
                         link_el = card.select_one("h2.jobTitle a")
                         if title_el and link_el:
+                            title = title_el.get_text(strip=True)
+                            if _is_senior_title(title):
+                                continue
                             job_id = link_el.get("data-jk", "")
                             jobs.append({
                                 "source": "Indeed",
-                                "title": title_el.get_text(strip=True),
+                                "title": title,
                                 "company": company_el.get_text(strip=True) if company_el else "",
                                 "location": location_el.get_text(strip=True) if location_el else "Singapore",
                                 "url": f"https://sg.indeed.com/viewjob?jk={job_id}" if job_id else f"https://sg.indeed.com{link_el.get('href','')}",
                                 "salary": "",
-                                "snippet": "",
+                                "snippet": "Entry level",
                             })
         except Exception as e:
             logger.warning(f"Indeed error for '{q}': {e}")
@@ -121,17 +162,19 @@ async def fetch_indeed(session: aiohttp.ClientSession) -> list[dict]:
 async def fetch_linkedin(session: aiohttp.ClientSession) -> list[dict]:
     jobs = []
     queries = [
-        "aviation operations manager",
-        "project manager aviation Singapore",
-        "data analyst airline Singapore",
-        "air transport management Singapore",
+        "aviation operations executive Singapore",
+        "junior data analyst aviation Singapore",
+        "airport operations officer Singapore",
+        "air transport associate Singapore",
+        "project coordinator aviation Singapore",
     ]
     for q in queries:
         try:
+            # f_E=2 = Entry level on LinkedIn
             url = (
                 f"https://www.linkedin.com/jobs/search"
                 f"?keywords={urllib.parse.quote(q)}&location=Singapore"
-                f"&sortBy=DD&f_TPR=r86400"  # last 24h
+                f"&sortBy=DD&f_TPR=r86400&f_E=2"  # last 24h + entry level
             )
             async with session.get(url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=15)) as resp:
                 if resp.status == 200:
@@ -144,14 +187,17 @@ async def fetch_linkedin(session: aiohttp.ClientSession) -> list[dict]:
                         location_el = card.select_one("span.job-search-card__location")
                         link_el = card.select_one("a.base-card__full-link")
                         if title_el:
+                            title = title_el.get_text(strip=True)
+                            if _is_senior_title(title):
+                                continue
                             jobs.append({
                                 "source": "LinkedIn",
-                                "title": title_el.get_text(strip=True),
+                                "title": title,
                                 "company": company_el.get_text(strip=True) if company_el else "",
                                 "location": location_el.get_text(strip=True) if location_el else "Singapore",
                                 "url": link_el.get("href", "") if link_el else "",
                                 "salary": "",
-                                "snippet": "",
+                                "snippet": "Entry level",
                             })
         except Exception as e:
             logger.warning(f"LinkedIn error for '{q}': {e}")
@@ -260,6 +306,7 @@ def _is_relevant_title(text: str) -> bool:
 def score_job(job: dict) -> int:
     """Score a job based on relevance to the user's Air Transport Management background."""
     title = (job.get("title") or "").lower()
+    snippet = (job.get("snippet") or "").lower()
     score = 0
 
     high_value = [
@@ -267,12 +314,13 @@ def score_job(job: dict) -> int:
         "ground handling", "cargo", "atm", "caas", "changi", "iata"
     ]
     medium_value = [
-        "project manager", "project management", "data analyst", "data analysis",
-        "operations manager", "operations analyst", "business analyst",
-        "planning", "strategy", "logistics", "supply chain"
+        "project coordinator", "data analyst", "data analysis",
+        "operations analyst", "business analyst", "operations executive",
+        "planning", "logistics", "supply chain"
     ]
-    bonus = [
-        "manager", "director", "head", "lead", "senior", "principal"
+    entry_level_bonus = [
+        "junior", "associate", "graduate", "trainee", "officer",
+        "executive", "coordinator", "assistant", "entry"
     ]
 
     for kw in high_value:
@@ -281,9 +329,17 @@ def score_job(job: dict) -> int:
     for kw in medium_value:
         if kw in title:
             score += 2
-    for kw in bonus:
+    for kw in entry_level_bonus:
         if kw in title:
-            score += 1
+            score += 2
+
+    # Boost if explicitly flagged as fresh-grad friendly
+    if "fresh" in snippet or "graduate" in snippet or "entry" in snippet:
+        score += 3
+
+    # Penalise any senior role that slipped through
+    if _is_senior_title(title):
+        score -= 10
 
     return score
 
