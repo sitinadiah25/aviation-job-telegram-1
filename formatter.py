@@ -17,6 +17,34 @@ ATM_SKILLS_MAP = {
         "Airline Strategy", "Revenue Management", "Network Planning",
         "Airline Economics", "Fleet Planning"
     ],
+    "flight": [
+        "Flight Operations Principles", "ICAO/IATA Standards", "Airspace Management",
+        "Operational Scheduling", "Aviation Safety & Security"
+    ],
+    "ground": [
+        "Ground Handling Operations", "Turnaround Coordination", "Airport Safety Procedures",
+        "Resource Allocation", "Service Level Management"
+    ],
+    "ramp": [
+        "Ramp Operations", "Turnaround Coordination", "Ground Handling",
+        "Aviation Safety Procedures", "Aircraft Servicing Protocols"
+    ],
+    "baggage": [
+        "Baggage Handling Systems", "Airport Operations", "Ground Handling",
+        "Service Recovery", "Passenger Experience"
+    ],
+    "air traffic": [
+        "Airspace Management", "Air Traffic Flow", "ICAO Procedures",
+        "Aviation Safety & Security", "Air Transport Economics"
+    ],
+    "customer service": [
+        "Passenger Experience Management", "Service Excellence", "Complaint Handling",
+        "Airport Operations", "Cross-Cultural Communication"
+    ],
+    "passenger": [
+        "Passenger Experience Management", "Airport Terminal Operations",
+        "Service Delivery", "Check-in & Boarding Procedures", "Customer Relations"
+    ],
     "project": [
         "Project Management", "Stakeholder Management", "Operations Research",
         "Strategic Planning", "Risk Management"
@@ -24,6 +52,10 @@ ATM_SKILLS_MAP = {
     "data": [
         "Data Analysis", "Aviation Statistics", "Demand Forecasting",
         "Traffic Flow Analysis", "Operations Research"
+    ],
+    "business analyst": [
+        "Business Analysis", "Process Mapping", "Data Analysis",
+        "Stakeholder Management", "Report Writing"
     ],
     "operations": [
         "Operations Management", "Process Optimisation", "Resource Planning",
@@ -48,6 +80,10 @@ ATM_SKILLS_MAP = {
     "manager": [
         "Leadership & Team Management", "Strategic Planning", "Budget Management",
         "Stakeholder Engagement", "Change Management"
+    ],
+    "coordinator": [
+        "Coordination & Scheduling", "Stakeholder Communication", "Project Support",
+        "Operations Planning", "Documentation & Reporting"
     ],
 }
 

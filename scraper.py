@@ -14,10 +14,20 @@ SEARCH_QUERIES = [
     "junior data analyst aviation",
     "air transport associate",
     "flight operations officer",
+    "ground operations officer",
     "ground handling officer",
+    "baggage officer",
+    "ramp officer",
+    "ramp agent",
+    "air traffic officer",
     "project coordinator aviation",
     "operations analyst entry level",
+    "customer service aviation",
+    "operations executive",
+    "data analyst entry level",
+    "business analyst entry level",
     "graduate aviation",
+    "graduate trainee operations",
 ]
 
 # Titles that suggest too much seniority — used to filter out irrelevant roles
@@ -30,7 +40,8 @@ SENIOR_TITLE_KEYWORDS = [
 # Entry-level positive signals in titles
 ENTRY_LEVEL_TITLE_SIGNALS = [
     "junior", "associate", "graduate", "trainee", "intern", "entry",
-    "assistant", "officer", "executive", "analyst", "coordinator", "specialist"
+    "assistant", "officer", "executive", "analyst", "coordinator", "specialist",
+    "agent", "attendant", "handler"
 ]
 
 HEADERS = {
@@ -48,10 +59,15 @@ HEADERS = {
 async def fetch_mcf(session: aiohttp.ClientSession) -> list[dict]:
     jobs = []
     keywords = [
-        "aviation", "air transport", "data analyst", "airport", "airline",
-        "project coordinator", "operations executive", "graduate trainee"
+        "aviation", "airport", "air transport", "airline",
+        "flight operations", "ground operations", "ground handling",
+        "baggage", "ramp", "air traffic",
+        "airport operations", "customer service aviation",
+        "data analyst", "business analyst",
+        "project coordinator", "operations executive",
+        "graduate trainee",
     ]
-    for keyword in keywords[:6]:  # limit requests
+    for keyword in keywords:  # iterate all keywords
         try:
             # MCF supports filtering by max years of experience via the API
             url = (
@@ -113,11 +129,19 @@ def _is_senior_title(title: str) -> bool:
 async def fetch_indeed(session: aiohttp.ClientSession) -> list[dict]:
     jobs = []
     queries = [
-        ("aviation executive entry level", "Singapore"),
-        ("junior data analyst aviation", "Singapore"),
+        ("aviation officer entry level", "Singapore"),
         ("airport operations officer", "Singapore"),
+        ("flight operations officer", "Singapore"),
+        ("ground operations officer", "Singapore"),
+        ("ramp agent entry level", "Singapore"),
+        ("baggage handler officer", "Singapore"),
+        ("air traffic officer", "Singapore"),
+        ("junior data analyst aviation", "Singapore"),
+        ("business analyst entry level", "Singapore"),
+        ("customer service aviation officer", "Singapore"),
+        ("operations executive entry level", "Singapore"),
+        ("project coordinator aviation", "Singapore"),
         ("graduate trainee aviation", "Singapore"),
-        ("project coordinator aviation fresh graduate", "Singapore"),
     ]
     for q, loc in queries:
         try:
@@ -162,11 +186,19 @@ async def fetch_indeed(session: aiohttp.ClientSession) -> list[dict]:
 async def fetch_linkedin(session: aiohttp.ClientSession) -> list[dict]:
     jobs = []
     queries = [
-        "aviation operations executive Singapore",
-        "junior data analyst aviation Singapore",
+        "aviation officer entry level Singapore",
         "airport operations officer Singapore",
-        "air transport associate Singapore",
+        "flight operations officer Singapore",
+        "ground operations officer Singapore",
+        "ramp agent Singapore",
+        "baggage officer aviation Singapore",
+        "air traffic officer Singapore",
+        "junior data analyst aviation Singapore",
+        "junior business analyst Singapore",
+        "customer service aviation Singapore",
+        "operations executive entry level Singapore",
         "project coordinator aviation Singapore",
+        "air transport management graduate Singapore",
     ]
     for q in queries:
         try:
@@ -293,7 +325,10 @@ RELEVANT_KEYWORDS = [
     "manager", "analyst", "operations", "aviation", "airport", "airline",
     "project", "data", "planning", "coordinator", "executive", "officer",
     "logistics", "transport", "fleet", "ground", "cargo", "safety", "compliance",
-    "strategy", "business", "commercial", "network", "revenue", "finance"
+    "strategy", "business", "commercial", "network", "revenue", "finance",
+    "flight", "ramp", "baggage", "air traffic", "customer service",
+    "handler", "agent", "attendant", "trainee", "graduate", "associate",
+    "air transport", "airside", "landside", "passenger", "terminal"
 ]
 
 def _is_relevant_title(text: str) -> bool:
@@ -311,12 +346,15 @@ def score_job(job: dict) -> int:
 
     high_value = [
         "aviation", "airline", "airport", "air transport", "flight operations",
-        "ground handling", "cargo", "atm", "caas", "changi", "iata"
+        "ground operations", "ground handling", "ramp", "baggage",
+        "air traffic", "airside", "cargo", "atm", "caas", "changi", "iata",
+        "airport operations", "passenger services", "customer service aviation"
     ]
     medium_value = [
         "project coordinator", "data analyst", "data analysis",
         "operations analyst", "business analyst", "operations executive",
-        "planning", "logistics", "supply chain"
+        "planning", "logistics", "supply chain", "customer service",
+        "operations", "transport", "terminal"
     ]
     entry_level_bonus = [
         "junior", "associate", "graduate", "trainee", "officer",
