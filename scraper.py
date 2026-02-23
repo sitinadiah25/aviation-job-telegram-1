@@ -393,10 +393,93 @@ def deduplicate(jobs: list[dict]) -> list[dict]:
     return unique
 
 
+# ─── Link Validation ─────────────────────────────────────────────────────────
+
+# Phrases in page content that indicate a job is expired/invalid
+EXPIRED_SIGNALS = [
+    "job listing not found", "this job has expired", "job has been closed",
+    "job is no longer available", "listing has been removed",
+    "position has been filled", "no longer accepting", "job not found",
+    "page not found", "404", "error 404", "this page does not exist",
+    "this role is no longer", "application closed", "expired",
+    "job listing is no longer", "this job is no longer",
+]
+
+async def is_valid_job_url(session: aiohttp.ClientSession, url: str) -> bool:
+    """
+    Return True if the URL resolves to a live, valid job listing.
+    Checks:
+      1. HTTP status — anything 4xx/5xx is dead
+      2. Page content — scans for expiry/error phrases
+    Portal "Visit careers page" links are always trusted (no uuid in path).
+    """
+    if not url or not url.startswith("http"):
+        return False
+
+    # Trust bare portal homepage links — these are always valid reference links
+    if url.endswith(".html") or url.endswith("/careers") or "careers.html" in url:
+        return True
+
+    try:
+        async with session.get(
+            url,
+            headers=HEADERS,
+            timeout=aiohttp.ClientTimeout(total=12),
+            allow_redirects=True,
+            max_redirects=5,
+        ) as resp:
+            # Hard fail on 4xx / 5xx
+            if resp.status >= 400:
+                logger.debug(f"Dead link ({resp.status}): {url}")
+                return False
+
+            # Read a chunk of the page — enough to catch error/expiry messages
+            try:
+                html = await resp.text(encoding="utf-8", errors="ignore")
+            except Exception:
+                return True  # can't read body, assume live
+
+            text_lower = html.lower()
+            for signal in EXPIRED_SIGNALS:
+                if signal in text_lower:
+                    logger.debug(f"Expired listing detected ('{signal}'): {url}")
+                    return False
+
+            return True
+
+    except asyncio.TimeoutError:
+        logger.debug(f"Timeout validating: {url}")
+        return False
+    except Exception as e:
+        logger.debug(f"Validation error for {url}: {e}")
+        return False
+
+
+async def validate_jobs(session: aiohttp.ClientSession, jobs: list[dict]) -> list[dict]:
+    """
+    Concurrently validate all job URLs, dropping dead/expired ones.
+    Uses a semaphore to avoid hammering servers.
+    """
+    sem = asyncio.Semaphore(8)  # max 8 concurrent checks
+
+    async def check(job):
+        async with sem:
+            valid = await is_valid_job_url(session, job.get("url", ""))
+            return job if valid else None
+
+    results = await asyncio.gather(*[check(j) for j in jobs])
+    valid_jobs = [j for j in results if j is not None]
+    dropped = len(jobs) - len(valid_jobs)
+    if dropped:
+        logger.info(f"Link validation: removed {dropped} expired/dead listing(s)")
+    return valid_jobs
+
+
 # ─── Main Entry ──────────────────────────────────────────────────────────────
 
 async def fetch_all_jobs() -> list[dict]:
     async with aiohttp.ClientSession() as session:
+        # Step 1: fetch from all sources in parallel
         results = await asyncio.gather(
             fetch_mcf(session),
             fetch_indeed(session),
@@ -405,13 +488,23 @@ async def fetch_all_jobs() -> list[dict]:
             return_exceptions=True
         )
 
-    all_jobs = []
-    for r in results:
-        if isinstance(r, list):
-            all_jobs.extend(r)
-        else:
-            logger.warning(f"A source returned an exception: {r}")
+        all_jobs = []
+        for r in results:
+            if isinstance(r, list):
+                all_jobs.extend(r)
+            else:
+                logger.warning(f"A source returned an exception: {r}")
 
-    all_jobs = deduplicate(all_jobs)
-    all_jobs.sort(key=score_job, reverse=True)
-    return all_jobs[:40]  # top 40 most relevant
+        # Step 2: deduplicate and pre-sort before validation
+        all_jobs = deduplicate(all_jobs)
+        all_jobs.sort(key=score_job, reverse=True)
+
+        # Step 3: take top 60 candidates, then validate links (drop expired/dead)
+        # We validate more than the final 40 so we still have enough after filtering
+        candidates = all_jobs[:60]
+        logger.info(f"Validating {len(candidates)} job links...")
+        valid_jobs = await validate_jobs(session, candidates)
+
+    # Step 4: return top 40 after validation
+    logger.info(f"{len(valid_jobs)} valid jobs after link check")
+    return valid_jobs[:40]
