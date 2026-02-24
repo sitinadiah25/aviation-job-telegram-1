@@ -17,8 +17,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-# TELEGRAM_CHAT_ID kept for backwards compatibility — owner is always pre-seeded as a subscriber.
-OWNER_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 SGT = pytz.timezone("Asia/Singapore")
 
 # ─── Bot Command Menu ─────────────────────────────────────────────────────────
@@ -33,7 +31,7 @@ BOT_COMMANDS = [
 
 # ─── Subscriber Store ────────────────────────────────────────────────────────
 # Persisted as JSON so subscribers survive bot restarts.
-# Note: Render resets the filesystem on redeploy, so users re-subscribe after redeployments.
+# Note: Railway resets the filesystem on redeploy, so users re-subscribe after redeployments.
 SUBSCRIBERS_FILE = "subscribers.json"
 
 def load_subscribers() -> set:
@@ -43,8 +41,6 @@ def load_subscribers() -> set:
             subs = set(str(cid) for cid in data)
     except (FileNotFoundError, json.JSONDecodeError):
         subs = set()
-    if OWNER_CHAT_ID:
-        subs.add(str(OWNER_CHAT_ID))
     return subs
 
 def save_subscribers(subs: set):

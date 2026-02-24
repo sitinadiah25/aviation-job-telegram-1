@@ -20,22 +20,24 @@ A Telegram bot that fetches daily job listings relevant to Air Transport Managem
 2. Send `/newbot` and follow the prompts
 3. Copy the **Bot Token** (looks like `123456789:ABCdef...`)
 
-### Step 2 — Get your Chat ID
-
-1. Start a chat with your new bot (send `/start`)
-2. Visit: `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates`
-3. Find `"chat":{"id": XXXXXXXXX}` — that's your **Chat ID**
-
-### Step 3 — Deploy to Render
+### Step 2 — Deploy to Railway
 
 1. Push this project to a **GitHub repository**
-2. Go to [render.com](https://render.com) and sign up/log in
-3. Click **New → Blueprint** and connect your GitHub repo
-4. Render will detect `render.yaml` automatically
-5. Set the two **Environment Variables** when prompted:
+2. Go to [railway.app](https://railway.app) and sign up/log in
+3. Click **New Project → Deploy from GitHub repo** and select your repo
+4. Railway will detect `railway.toml` automatically
+5. Go to your service → **Variables** tab and add:
    - `TELEGRAM_BOT_TOKEN` → your bot token from Step 1
-   - `TELEGRAM_CHAT_ID` → your chat ID from Step 2
-6. Click **Apply** — your bot will be live in ~2 minutes!
+6. Railway will build and deploy automatically — your bot will be live in ~1 minute!
+
+### Step 3 — Subscribe
+
+Once the bot is live, anyone can start receiving daily updates by messaging it:
+1. Open the bot on Telegram
+2. Send `/start`
+3. Send `/subscribe`
+
+That's it — no chat IDs needed. Anyone who subscribes will get updates at 9AM, 12PM, and 3PM SGT.
 
 ---
 
@@ -63,7 +65,7 @@ aviation-job-bot/
 ├── scraper.py      # Job fetching from all sources
 ├── formatter.py    # Message formatting + ATM skill matching
 ├── requirements.txt
-├── render.yaml     # Render deployment config
+├── railway.toml    # Railway deployment config
 └── README.md
 ```
 
