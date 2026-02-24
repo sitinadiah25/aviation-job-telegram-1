@@ -2,7 +2,7 @@ import os
 import json
 import logging
 import asyncio
-from telegram import Update, Bot
+from telegram import Update, Bot, BotCommand
 from telegram.ext import Application, CommandHandler, ContextTypes
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -20,6 +20,16 @@ BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 # TELEGRAM_CHAT_ID kept for backwards compatibility — owner is always pre-seeded as a subscriber.
 OWNER_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 SGT = pytz.timezone("Asia/Singapore")
+
+# ─── Bot Command Menu ─────────────────────────────────────────────────────────
+# These show up when users type "/" in the Telegram keyboard.
+BOT_COMMANDS = [
+    BotCommand("start",       "Show welcome message and bot info"),
+    BotCommand("subscribe",   "Start receiving daily job updates (9AM, 12PM, 3PM SGT)"),
+    BotCommand("unsubscribe", "Stop receiving daily job updates"),
+    BotCommand("status",      "Check if you are subscribed"),
+    BotCommand("latest",      "Fetch the latest job listings right now"),
+]
 
 # ─── Subscriber Store ────────────────────────────────────────────────────────
 # Persisted as JSON so subscribers survive bot restarts.
@@ -68,10 +78,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status_line = "You are already subscribed!" if already else "Use /subscribe to sign up for daily alerts."
     await update.message.reply_text(
         "*Aviation and PM Job Bot*\n\n"
-        "Sends daily job listings at 9:00 AM SGT for aviation, project management, "
-        "and data analysis roles, tailored for Air Transport Management graduates.\n\n"
+        "Sends job listings 3x daily at 9:00 AM, 12:00 PM, and 3:00 PM SGT, "
+        "covering aviation, admin, project management, data analysis, "
+        "and airport counter roles — tailored for Air Transport Management graduates.\n\n"
         "*Commands:*\n"
-        "/subscribe - Start receiving daily 9AM updates\n"
+        "/subscribe - Start receiving daily job updates\n"
         "/unsubscribe - Stop receiving daily updates\n"
         "/latest - Fetch the latest job listings now\n"
         "/status - Check if you are subscribed\n\n"
@@ -82,14 +93,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
     if chat_id in subscribers:
-        await update.message.reply_text("You are already subscribed! You will receive updates at 9:00 AM SGT daily.")
+        await update.message.reply_text(
+            "You are already subscribed!\n"
+            "You will receive job updates at 9:00 AM, 12:00 PM, and 3:00 PM SGT daily."
+        )
         return
     subscribers.add(chat_id)
     save_subscribers(subscribers)
     logger.info(f"New subscriber: {chat_id} (total: {len(subscribers)})")
     await update.message.reply_text(
         "*Subscribed!*\n\n"
-        "You will now receive job listings every day at 9:00 AM SGT.\n"
+        "You will now receive job listings at:\n"
+        "- 9:00 AM SGT\n"
+        "- 12:00 PM SGT\n"
+        "- 3:00 PM SGT\n\n"
         "Use /latest to fetch jobs right now, or /unsubscribe to stop anytime.",
         parse_mode="Markdown"
     )
@@ -110,9 +127,14 @@ async def unsubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
     if chat_id in subscribers:
-        await update.message.reply_text("You are subscribed and will receive updates at 9:00 AM SGT daily.")
+        await update.message.reply_text(
+            "You are subscribed and will receive job updates at "
+            "9:00 AM, 12:00 PM, and 3:00 PM SGT daily."
+        )
     else:
-        await update.message.reply_text("You are not subscribed. Use /subscribe to sign up.")
+        await update.message.reply_text(
+            "You are not subscribed. Use /subscribe to sign up."
+        )
 
 async def latest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Fetching latest jobs... this may take a moment.")
@@ -151,16 +173,27 @@ async def scheduled_job(bot: Bot, hour: int = 9):
 
 # ─── Main ────────────────────────────────────────────────────────────────────
 
+async def post_init(application: Application):
+    """Runs once after the bot starts — registers the command menu with Telegram."""
+    await application.bot.set_my_commands(BOT_COMMANDS)
+    logger.info("Bot command menu registered.")
+
 def main():
     if not BOT_TOKEN:
         raise ValueError("TELEGRAM_BOT_TOKEN environment variable not set")
 
-    app = Application.builder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("subscribe", subscribe))
+    app = (
+        Application.builder()
+        .token(BOT_TOKEN)
+        .post_init(post_init)
+        .build()
+    )
+
+    app.add_handler(CommandHandler("start",       start))
+    app.add_handler(CommandHandler("subscribe",   subscribe))
     app.add_handler(CommandHandler("unsubscribe", unsubscribe))
-    app.add_handler(CommandHandler("status", status))
-    app.add_handler(CommandHandler("latest", latest))
+    app.add_handler(CommandHandler("status",      status))
+    app.add_handler(CommandHandler("latest",      latest))
 
     scheduler = AsyncIOScheduler(timezone=SGT)
     for hour in [9, 12, 15]:
