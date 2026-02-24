@@ -85,6 +85,42 @@ ATM_SKILLS_MAP = {
         "Coordination & Scheduling", "Stakeholder Communication", "Project Support",
         "Operations Planning", "Documentation & Reporting"
     ],
+    "admin": [
+        "Administrative Support", "Documentation & Records Management",
+        "Scheduling & Coordination", "Office Operations", "Report Writing"
+    ],
+    "administrative": [
+        "Administrative Support", "Documentation & Records Management",
+        "Scheduling & Coordination", "Office Operations", "Report Writing"
+    ],
+    "check-in": [
+        "Passenger Experience Management", "Check-in & Boarding Procedures",
+        "Airport Customer Service", "IATA Ticketing Standards", "Baggage Handling"
+    ],
+    "check in": [
+        "Passenger Experience Management", "Check-in & Boarding Procedures",
+        "Airport Customer Service", "IATA Ticketing Standards", "Baggage Handling"
+    ],
+    "ticketing": [
+        "IATA Ticketing & Fares", "Airline Reservation Systems",
+        "Passenger Experience", "Revenue Management Basics", "Customer Service"
+    ],
+    "counter": [
+        "Airport Terminal Operations", "Passenger Experience Management",
+        "Check-in & Boarding Procedures", "Customer Relations", "Service Recovery"
+    ],
+    "guest service": [
+        "Passenger Experience Management", "Service Excellence",
+        "Airport Terminal Operations", "Complaint Handling", "Cross-Cultural Communication"
+    ],
+    "business analyst": [
+        "Business Analysis", "Process Mapping & Improvement", "Data Analysis",
+        "Stakeholder Management", "Aviation Market Research"
+    ],
+    "junior business": [
+        "Business Analysis", "Process Mapping & Improvement", "Data Analysis",
+        "Stakeholder Management", "Report Writing"
+    ],
 }
 
 SOURCE_EMOJI = {
@@ -159,14 +195,16 @@ def _escape(text: str) -> str:
     return text
 
 
-def format_jobs_message(jobs: list[dict]) -> list[str]:
+def format_jobs_message(jobs: list[dict], schedule_label: str = None) -> list[str]:
     """Split jobs into Telegram-safe messages (max 4096 chars each)."""
     if not jobs:
         return ["No relevant jobs found at this time. Please check back later."]
 
     now = datetime.now(SGT).strftime("%d %b %Y, %I:%M %p SGT")
+    slot_line = f"🔔 *{schedule_label} SGT Update*\n" if schedule_label else ""
     header = (
         f"✈️ *Aviation & PM Job Listings*\n"
+        f"{slot_line}"
         f"🎯 Fresh Grad & 1–2 Years Exp\n"
         f"🕐 Updated: {now}\n"
         f"📊 {len(jobs)} jobs found\n"
